@@ -1,0 +1,3 @@
+py-evm
+eth-abi
+pyright

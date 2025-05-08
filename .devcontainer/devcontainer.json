@@ -1,0 +1,21 @@
+{
+	"name": "Ubuntu",
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/rust:1": {
+			"version": "latest"
+		},
+		"ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+	},
+	"postCreateCommand": "sudo apt update && sudo apt install -y parallel && curl -L https://foundry.paradigm.xyz | bash && ~/.foundry/bin/foundryup && pip install -r requirements.txt",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.analysis.typeCheckingMode": "strict"
+			}
+		}
+	}
+}
