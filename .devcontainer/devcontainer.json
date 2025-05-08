@@ -13,6 +13,9 @@
 	"postCreateCommand": "sudo apt update && sudo apt install -y parallel && curl -L https://foundry.paradigm.xyz | bash && ~/.foundry/bin/foundryup && pip install -r requirements.txt",
 	"customizations": {
 		"vscode": {
+			"extensions": [
+				"juanblanco.solidity"
+			],
 			"settings": {
 				"python.analysis.typeCheckingMode": "strict"
 			}
