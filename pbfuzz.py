@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import json
 import os
-from typing import cast
+from typing import cast, Any
 
 from eth.abc import ComputationAPI, VirtualMachineAPI
 from eth.db.atomic import AtomicDB
@@ -70,6 +71,25 @@ def create_and_execute_tx(vm: VirtualMachineAPI, signer: Account, to: Address, d
 
     return computation
 
+class Contract:
+    abi: list[dict[str, Any]]
+    bytecode: bytes
+    deployedBytecode: bytes
+
+    def __init__(self, abi: list[dict[str, Any]], bytecode: bytes, deployedBytecode: bytes) -> None:
+        self.abi = abi
+        self.bytecode = bytecode
+        self.deployedBytecode = deployedBytecode
+
+def get_contract() -> Contract:
+    with open('./contract/out/BergToken.sol/BergToken.json', 'r') as f:
+        contract_json = f.read()
+        contract = json.loads(contract_json) # type: ignore
+        return Contract(
+            abi=contract['abi'], # type: ignore
+            bytecode=bytes.fromhex(contract['bytecode']['object'][2:]),
+            deployedBytecode=bytes.fromhex(contract['deployedBytecode']['object'][2:])
+        )
 
 def main() -> None:
     vm = get_vm()
@@ -86,6 +106,8 @@ def main() -> None:
     print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
     print(f"Computation: {computation}, error: {computation.is_error}, gas: {computation.get_gas_used()}")
 
+    contract = get_contract()
+    print(f"Contract: {contract}")
 
 if __name__ == "__main__":
     try:
