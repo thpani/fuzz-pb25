@@ -5,9 +5,10 @@ import json
 import os
 from typing import cast, Any
 
+import eth
 from eth.abc import ComputationAPI, VirtualMachineAPI
 from eth.db.atomic import AtomicDB
-from eth.constants import GENESIS_BLOCK_NUMBER, ZERO_ADDRESS
+from eth.constants import CREATE_CONTRACT_ADDRESS, GENESIS_BLOCK_NUMBER, ZERO_ADDRESS
 from eth.chains.base import Chain
 from eth.vm.forks.shanghai.transactions import ShanghaiTransactionBuilder
 from eth.vm.forks.cancun import CancunVM
@@ -45,7 +46,7 @@ def get_vm() -> VirtualMachineAPI:
     return chain.get_vm()
 
 
-def create_and_execute_tx(vm: VirtualMachineAPI, signer: Account, to: Address, data: bytes = b'', value: int = 0) -> ComputationAPI:
+def create_and_execute_tx(vm: VirtualMachineAPI, signer: Account, to: Address, data: bytes, value: int = 0) -> ComputationAPI:
     # create a transaction
     builder = cast(ShanghaiTransactionBuilder, vm.get_transaction_builder())
     tx = builder.new_unsigned_dynamic_fee_transaction(
@@ -75,6 +76,7 @@ class Contract:
     abi: list[dict[str, Any]]
     bytecode: bytes
     deployedBytecode: bytes
+    address: Address
 
     def __init__(self, abi: list[dict[str, Any]], bytecode: bytes, deployedBytecode: bytes) -> None:
         self.abi = abi
@@ -91,23 +93,34 @@ def get_contract() -> Contract:
             deployedBytecode=bytes.fromhex(contract['deployedBytecode']['object'][2:])
         )
 
+def deploy_contract(vm: VirtualMachineAPI, contract: Contract, account: Account) -> Address:
+    # generate a new contract address. this uses the nonce of the account - keep it before the deploy!
+    contract_address = Address(eth._utils.address.generate_contract_address(account.address, vm.state.get_nonce(account.address))) # type: ignore
+
+    computation = create_and_execute_tx(
+        vm,
+        signer=account,
+        to=CREATE_CONTRACT_ADDRESS,
+        data=contract.bytecode,
+        value=0,
+    )
+
+    if computation.is_error:
+        raise Exception(f"Error deploying contract: {computation.error}")
+
+    return contract_address
+
 def main() -> None:
     vm = get_vm()
     account = Account()
     print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
 
-    computation = create_and_execute_tx(
-        vm,
-        signer=account,
-        to=Account().address,
-        data=b'',
-        value=0,
-    )
-    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
-    print(f"Computation: {computation}, error: {computation.is_error}, gas: {computation.get_gas_used()}")
-
     contract = get_contract()
-    print(f"Contract: {contract}")
+    contract.address = deploy_contract(vm, contract, account)
+    assert vm.state.get_code(contract.address) == contract.deployedBytecode, "Deployed bytecode does not match the expected bytecode"
+    print(f"Contract deployed at: 0x{contract.address.hex()}")
+    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
+
 
 if __name__ == "__main__":
     try:
