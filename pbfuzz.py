@@ -13,10 +13,10 @@ from eth.chains.base import Chain
 from eth.vm.forks.shanghai.transactions import ShanghaiTransactionBuilder
 from eth.vm.forks.cancun import CancunVM
 
+from eth_abi import abi
 from eth_keys.datatypes import PrivateKey
 from eth_utils.crypto import keccak
 from eth_typing import Address
-
 
 class Account:
     def __init__(self, private_key_bytes: bytes|None = None):
@@ -121,6 +121,23 @@ def main() -> None:
     print(f"Contract deployed at: 0x{contract.address.hex()}")
     print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
 
+    # mint(account, 1000)
+    computation = create_and_execute_tx(
+        vm, account, contract.address,
+        keccak(text="mint(address,uint256)")[:4] + abi.encode(['address', 'uint256'], [account.address, 1000])
+    )
+    assert(computation.is_success)
+    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
+
+    # balances(account)
+    computation = create_and_execute_tx(
+        vm, account, contract.address,
+        keccak(text="balances(address)")[:4] + abi.encode(['address'], [account.address])
+    )
+    assert(computation.is_success)
+    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
+    balance, = abi.decode(['uint256'], computation.output)
+    print(f"Account balance: {balance}")
 
 if __name__ == "__main__":
     try:
