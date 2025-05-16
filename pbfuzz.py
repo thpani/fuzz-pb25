@@ -3,6 +3,7 @@
 
 import json
 import os
+import random
 from typing import cast, Any
 
 import eth
@@ -121,23 +122,23 @@ def main() -> None:
     print(f"Contract deployed at: 0x{contract.address.hex()}")
     print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
 
-    # mint(account, 1000)
-    computation = create_and_execute_tx(
-        vm, account, contract.address,
-        keccak(text="mint(address,uint256)")[:4] + abi.encode(['address', 'uint256'], [account.address, 1000])
-    )
-    assert(computation.is_success)
-    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
+    fuzzed_functions = [ f for f in contract.abi if f['type'] == 'function' ]
 
-    # balances(account)
-    computation = create_and_execute_tx(
-        vm, account, contract.address,
-        keccak(text="balances(address)")[:4] + abi.encode(['address'], [account.address])
-    )
-    assert(computation.is_success)
-    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
-    balance, = abi.decode(['uint256'], computation.output)
-    print(f"Account balance: {balance}")
+    for episode in range(10_000):
+        # randomly select a function to fuzz
+        function = random.choice(fuzzed_functions)
+
+        # generate random bytestring for arguments
+        arg_len = random.randint(0, 96)
+        args = random.randbytes(arg_len)
+
+        # encode the function call
+        signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
+        calldata = keccak(text=signature)[:4] + args
+
+        computation = create_and_execute_tx(vm, account, contract.address, calldata)
+
+        print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']} with 0x{calldata.hex()}")
 
 if __name__ == "__main__":
     try:
