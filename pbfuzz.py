@@ -135,7 +135,7 @@ def main() -> None:
     print(f"Contract deployed at: 0x{contract.address.hex()}")
     print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
 
-    fuzzed_functions = [ f for f in contract.abi if f['type'] == 'function' ]
+    fuzzed_functions = [ f for f in contract.abi if f['type'] == 'function' and f['stateMutability'] in ['nonpayable', 'payable'] ]
 
     for episode in range(10_000):
         # randomly select a function to fuzz
