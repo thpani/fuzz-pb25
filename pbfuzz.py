@@ -128,13 +128,11 @@ def main() -> None:
         # randomly select a function to fuzz
         function = random.choice(fuzzed_functions)
 
-        # generate random bytestring for arguments
-        arg_len = random.randint(0, 32)
-        args = random.randbytes(arg_len)
+        a = Account()
 
         # encode the function call
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
-        calldata = keccak(text=signature)[:4] + args
+        calldata = keccak(text=signature)[:4] + abi.encode(['address'], [a.address])
 
         computation = create_and_execute_tx(vm, account, contract.address, calldata)
 
