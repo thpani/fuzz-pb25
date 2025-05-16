@@ -94,13 +94,17 @@ def get_contract() -> Contract:
             deployedBytecode=bytes.fromhex(contract['deployedBytecode']['object'][2:])
         )
 
-def deploy_contract(vm: VirtualMachineAPI, contract: Contract, account: Account) -> Address:
+ALL_EOA = [ Account() for _ in range(5) ]
+DEPLOYER = ALL_EOA[0]
+ALL_ADDRESSES = [ a.address for a in ALL_EOA ]
+
+def deploy_contract(vm: VirtualMachineAPI, contract: Contract) -> Address:
     # generate a new contract address. this uses the nonce of the account - keep it before the deploy!
-    contract_address = Address(eth._utils.address.generate_contract_address(account.address, vm.state.get_nonce(account.address))) # type: ignore
+    contract_address = Address(eth._utils.address.generate_contract_address(DEPLOYER.address, vm.state.get_nonce(DEPLOYER.address))) # type: ignore
 
     computation = create_and_execute_tx(
         vm,
-        signer=account,
+        signer=DEPLOYER,
         to=CREATE_CONTRACT_ADDRESS,
         data=contract.bytecode,
         value=0,
@@ -111,10 +115,9 @@ def deploy_contract(vm: VirtualMachineAPI, contract: Contract, account: Account)
 
     return contract_address
 
-
 def random_input(t: str) -> Any:
     if t == 'address':
-        return Account().address
+        return random.choice(ALL_ADDRESSES) # TODO: should also cover other possible choices, including address(0) and precompiles
     elif t == 'uint8':
         return random.randint(0, 2**8 - 1)
     elif t == 'uint256':
@@ -126,14 +129,11 @@ def random_input(t: str) -> Any:
 
 def main() -> None:
     vm = get_vm()
-    account = Account()
-    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
-
     contract = get_contract()
-    contract.address = deploy_contract(vm, contract, account)
-    assert vm.state.get_code(contract.address) == contract.deployedBytecode, "Deployed bytecode does not match the expected bytecode"
+    contract.address = deploy_contract(vm, contract)
+    ALL_ADDRESSES.append(contract.address)
+    assert(vm.state.get_code(contract.address) == contract.deployedBytecode)
     print(f"Contract deployed at: 0x{contract.address.hex()}")
-    print(f"Account: {account}, nonce: {vm.state.get_nonce(account.address)}")
 
     fuzzed_functions = [ f for f in contract.abi if f['type'] == 'function' and f['stateMutability'] in ['nonpayable', 'payable'] ]
 
@@ -149,7 +149,7 @@ def main() -> None:
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
         calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
 
-        computation = create_and_execute_tx(vm, account, contract.address, calldata)
+        computation = create_and_execute_tx(vm, DEPLOYER, contract.address, calldata)
 
         print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
