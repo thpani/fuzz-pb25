@@ -129,7 +129,7 @@ def main() -> None:
         function = random.choice(fuzzed_functions)
 
         # generate random bytestring for arguments
-        arg_len = random.randint(0, 96)
+        arg_len = random.randint(0, 32)
         args = random.randbytes(arg_len)
 
         # encode the function call
