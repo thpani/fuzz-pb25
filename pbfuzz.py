@@ -111,6 +111,19 @@ def deploy_contract(vm: VirtualMachineAPI, contract: Contract, account: Account)
 
     return contract_address
 
+
+def random_input(t: str) -> Any:
+    if t == 'address':
+        return Account().address
+    elif t == 'uint8':
+        return random.randint(0, 2**8 - 1)
+    elif t == 'uint256':
+        return random.randint(0, 2**256 - 1)
+    elif t == 'bytes32':
+        return random.randbytes(32)
+    else:
+        raise ValueError(f"Unknown type: {t}")
+
 def main() -> None:
     vm = get_vm()
     account = Account()
@@ -128,15 +141,17 @@ def main() -> None:
         # randomly select a function to fuzz
         function = random.choice(fuzzed_functions)
 
-        a = Account()
+        # abi inputs
+        input_types = [ i['type'] for i in function['inputs'] ]
+        random_inputs = [ random_input(t) for t in input_types ]
 
         # encode the function call
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
-        calldata = keccak(text=signature)[:4] + abi.encode(['address'], [a.address])
+        calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
 
         computation = create_and_execute_tx(vm, account, contract.address, calldata)
 
-        print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']} with 0x{calldata.hex()}")
+        print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
 if __name__ == "__main__":
     try:
