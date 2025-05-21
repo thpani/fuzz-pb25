@@ -5,6 +5,7 @@ import json
 import os
 import random
 from typing import cast, Any
+import sys
 
 import eth
 from eth.abc import ComputationAPI, VirtualMachineAPI
@@ -127,6 +128,17 @@ def random_input(t: str) -> Any:
     else:
         raise ValueError(f"Unknown type: {t}")
 
+def totalSupply(vm: VirtualMachineAPI, contract: Contract) -> int:
+    # fetch total supply
+    computation = create_and_execute_tx(
+        vm,
+        signer=DEPLOYER,
+        to=contract.address,
+        data=keccak(text='totalSupply()')[:4],
+    )
+    assert computation.is_success, "totalSupply failed"
+    return abi.decode(['uint256'], computation.output)[0]
+
 def main() -> None:
     vm = get_vm()
     contract = get_contract()
@@ -151,7 +163,14 @@ def main() -> None:
 
         computation = create_and_execute_tx(vm, DEPLOYER, contract.address, calldata)
 
-        print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
+        if computation.is_success:
+            print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
+
+        invariant = totalSupply(vm, contract) == 0
+        if not invariant:
+            print(f"INVARIANT FAILED: totalSupply() != 0")
+            print(f"totalSupply() = {totalSupply(vm, contract)}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     try:
