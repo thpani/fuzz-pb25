@@ -161,6 +161,11 @@ def main() -> None:
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
         calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
 
+        # skip functions that are not callable
+        if function['name'] == 'removeAdmin':
+            # skip this function, it disables most other functions
+            continue
+
         computation = create_and_execute_tx(vm, DEPLOYER, contract.address, calldata)
 
         if computation.is_success:
