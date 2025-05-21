@@ -157,6 +157,9 @@ def main() -> None:
         input_types = [ i['type'] for i in function['inputs'] ]
         random_inputs = [ random_input(t) for t in input_types ]
 
+        # randomly select the caller
+        caller = random.choice(ALL_EOA)
+
         # encode the function call
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
         calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
@@ -166,10 +169,10 @@ def main() -> None:
             # skip this function, it disables most other functions
             continue
 
-        computation = create_and_execute_tx(vm, DEPLOYER, contract.address, calldata)
+        computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
         if computation.is_success:
-            print(f"{episode:06} {('success' if computation.is_success else 'error'):7} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
+            print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
         invariant = totalSupply(vm, contract) == 0
         if not invariant:
