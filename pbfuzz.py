@@ -128,6 +128,17 @@ def random_input(t: str) -> Any:
     else:
         raise ValueError(f"Unknown type: {t}")
 
+def balanceOf(vm: VirtualMachineAPI, contract: Contract, address: Address) -> int:
+    # fetch balance
+    computation = create_and_execute_tx(
+        vm,
+        signer=DEPLOYER,
+        to=contract.address,
+        data=keccak(text='balances(address)')[:4] + abi.encode(['address'], [address]),
+    )
+    assert computation.is_success, "balanceOf failed"
+    return abi.decode(['uint256'], computation.output)[0]
+
 def totalSupply(vm: VirtualMachineAPI, contract: Contract) -> int:
     # fetch total supply
     computation = create_and_execute_tx(
@@ -174,10 +185,11 @@ def main() -> None:
         if computation.is_success:
             print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
-        invariant = totalSupply(vm, contract) == 0
+        invariant = sum([balanceOf(vm, contract, a) for a in ALL_ADDRESSES]) == totalSupply(vm, contract)
         if not invariant:
-            print(f"INVARIANT FAILED: totalSupply() != 0")
-            print(f"totalSupply() = {totalSupply(vm, contract)}")
+            print(f"INVARIANT FAILED: totalSupply() != sum(balances)")
+            print(f"totalSupply: {totalSupply(vm, contract)}")
+            print(f"balances: {[balanceOf(vm, contract, a) for a in ALL_ADDRESSES]}")
             sys.exit(1)
         
         if episode % 100 == 0:
