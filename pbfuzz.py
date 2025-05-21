@@ -171,6 +171,9 @@ def main() -> None:
             print(f"INVARIANT FAILED: totalSupply() != 0")
             print(f"totalSupply() = {totalSupply(vm, contract)}")
             sys.exit(1)
+        
+        if episode % 100 == 0:
+            sys.stdout.flush()
 
 if __name__ == "__main__":
     try:
