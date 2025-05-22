@@ -198,7 +198,9 @@ def main() -> None:
 
     fuzzed_functions = [ f for f in contract.abi if f['type'] == 'function' and f['stateMutability'] in ['nonpayable', 'payable'] ]
 
-    for episode in range(10_000):
+    function_success_and_error = { function['name']: (0, 0) for function in fuzzed_functions }
+
+    for episode in range(1_000):
         # randomly select a function to fuzz
         function = random.choice(fuzzed_functions)
 
@@ -221,8 +223,12 @@ def main() -> None:
         computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
         if computation.is_error:
+            # count the error
+            function_success_and_error[function['name']] = (function_success_and_error[function['name']][0], function_success_and_error[function['name']][1] + 1)
             print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])}) => {decode_error(computation)}")
         else:
+            # count the success
+            function_success_and_error[function['name']] = (function_success_and_error[function['name']][0] + 1, function_success_and_error[function['name']][1])
             print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
         invariant = sum([balanceOf(vm, contract, a) for a in ALL_ADDRESSES]) == totalSupply(vm, contract)
@@ -248,6 +254,11 @@ def main() -> None:
         
         if episode % 100 == 0:
             sys.stdout.flush()
+
+    # print the function success and error counts
+    print("Function success and error counts:")
+    for function, (success, error) in function_success_and_error.items():
+        print(f"{function}: {success} success, {error} error")
 
 if __name__ == "__main__":
     try:
