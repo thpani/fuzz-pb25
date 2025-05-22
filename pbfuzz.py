@@ -238,6 +238,13 @@ def main() -> None:
             print(f"totalStakingShares: {totalStakingShares(vm, contract)}")
             print(f"stakingShares: {[stakingShares(vm, contract, a.address) for a in ALL_EOA]}")
             sys.exit(1)
+
+        invariant3 = balanceOf(vm, contract, contract.address) == totalStakingShares(vm, contract)
+        if not invariant3:
+            print(f"INVARIANT3 FAILED: balanceOf(contract.address) != totalStakingShares()")
+            print(f"balanceOf: {balanceOf(vm, contract, contract.address)}")
+            print(f"totalStakingShares: {totalStakingShares(vm, contract)}")
+            sys.exit(1)
         
         if episode % 100 == 0:
             sys.stdout.flush()
