@@ -188,6 +188,22 @@ def totalStakingShares(vm: VirtualMachineAPI, contract: Contract) -> int:
     assert computation.is_success, "totalStakingShares failed"
     return abi.decode(['uint256'], computation.output)[0]
 
+def count_admins(vm: VirtualMachineAPI, contract: Contract) -> int:
+    sum = 0
+    for a in ALL_EOA:
+        # fetch admins
+        computation = create_and_execute_tx(
+            vm,
+            signer=DEPLOYER,
+            to=contract.address,
+            data=keccak(text='admins(address)')[:4] + abi.encode(['address'], [a.address]),
+        )
+        assert computation.is_success, "admins(address) failed"
+        is_admin = abi.decode(['bool'], computation.output)[0]
+        if is_admin:
+            sum += 1
+    return sum
+
 def main() -> None:
     vm = get_vm()
     contract = get_contract()
@@ -217,8 +233,9 @@ def main() -> None:
 
         # skip functions that are not callable
         if function['name'] == 'removeAdmin':
-            # skip this function, it disables most other functions
-            continue
+            if count_admins(vm, contract) == 1:
+                # only one admin left, cannot remove
+                continue
 
         computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
