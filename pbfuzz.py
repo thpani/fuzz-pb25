@@ -128,6 +128,22 @@ def random_input(t: str) -> Any:
     else:
         raise ValueError(f"Unknown type: {t}")
 
+def decode_error(computation: ComputationAPI) -> str:
+    assert computation.is_error, "Computation must be an error to decode it"
+    if computation.error.args:
+        error_sig = computation.error.args[0][:4]
+        if error_sig == keccak(text='Error(string)')[:4]:
+            # revert() with a string
+            return "Error('{}')".format(abi.decode(['string'], computation.error.args[0][4:])[0])
+        elif error_sig == keccak(text='Panic(uint256)')[:4]:
+            # panics inserted by the compiler
+            error_code = abi.decode(['uint256'], computation.error.args[0][4:])[0]
+            if error_code == 0x11:
+                return "Panic(arithmetic under/overflow)"
+            else:
+                return f"Panic(0x{error_code:02x})"
+    return f"Error: {computation.error}"
+
 def balanceOf(vm: VirtualMachineAPI, contract: Contract, address: Address) -> int:
     # fetch balance
     computation = create_and_execute_tx(
@@ -182,7 +198,9 @@ def main() -> None:
 
         computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
-        if computation.is_success:
+        if computation.is_error:
+            print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])}) => {decode_error(computation)}")
+        else:
             print(f"{episode:06} {('success' if computation.is_success else 'error'):7} 0x{caller.address.hex()} {function['name']}({', '.join([f"0x{i.hex()}" if isinstance(i, bytes) else f"{i}" for i in random_inputs])})")
 
         invariant = sum([balanceOf(vm, contract, a) for a in ALL_ADDRESSES]) == totalSupply(vm, contract)
