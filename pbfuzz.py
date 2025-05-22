@@ -166,6 +166,28 @@ def totalSupply(vm: VirtualMachineAPI, contract: Contract) -> int:
     assert computation.is_success, "totalSupply failed"
     return abi.decode(['uint256'], computation.output)[0]
 
+def stakingShares(vm: VirtualMachineAPI, contract: Contract, address: Address) -> int:
+    # fetch staking shares
+    computation = create_and_execute_tx(
+        vm,
+        signer=DEPLOYER,
+        to=contract.address,
+        data=keccak(text='stakingShares(address)')[:4] + abi.encode(['address'], [address]),
+    )
+    assert computation.is_success, "stakingShares failed"
+    return abi.decode(['uint256'], computation.output)[0]
+
+def totalStakingShares(vm: VirtualMachineAPI, contract: Contract) -> int:
+    # fetch total staking shares
+    computation = create_and_execute_tx(
+        vm,
+        signer=DEPLOYER,
+        to=contract.address,
+        data=keccak(text='totalStakingShares()')[:4],
+    )
+    assert computation.is_success, "totalStakingShares failed"
+    return abi.decode(['uint256'], computation.output)[0]
+
 def main() -> None:
     vm = get_vm()
     contract = get_contract()
@@ -208,6 +230,13 @@ def main() -> None:
             print(f"INVARIANT FAILED: totalSupply() != sum(balances)")
             print(f"totalSupply: {totalSupply(vm, contract)}")
             print(f"balances: {[balanceOf(vm, contract, a) for a in ALL_ADDRESSES]}")
+            sys.exit(1)
+
+        invariant2 = sum([stakingShares(vm, contract, a.address) for a in ALL_EOA]) == totalStakingShares(vm, contract)
+        if not invariant2:
+            print(f"INVARIANT2 FAILED: totalStakingShares() != sum(stakingShares)")
+            print(f"totalStakingShares: {totalStakingShares(vm, contract)}")
+            print(f"stakingShares: {[stakingShares(vm, contract, a.address) for a in ALL_EOA]}")
             sys.exit(1)
         
         if episode % 100 == 0:
