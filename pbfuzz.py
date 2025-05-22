@@ -227,15 +227,27 @@ def main() -> None:
         # randomly select the caller
         caller = random.choice(ALL_EOA)
 
-        # encode the function call
-        signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
-        calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
-
-        # skip functions that are not callable
+        # customize fuzzer for specific functions
         if function['name'] == 'removeAdmin':
             if count_admins(vm, contract) == 1:
                 # only one admin left, cannot remove
                 continue
+        elif function['name'] == 'stake':
+            balance = balanceOf(vm, contract, caller.address)
+            random_inputs[0] = random.randint(0, min(balance * 2, 2**256 - 1))
+            # TODO: fuzz higher values!
+        elif function['name'] == 'unstake':
+            shares = stakingShares(vm, contract, caller.address)
+            if shares == 0:
+                # no shares to unstake
+                # TODO: we should sometimes fuzz this too
+                continue
+            random_inputs[0] = random.randint(1, min(2 * shares, 2**256 - 1))
+            # TODO: fuzz higher values!
+
+        # encode the function call
+        signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
+        calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
 
         computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
