@@ -53,6 +53,7 @@ contract BergToken {
     // Mint tokens
     function mint(address to, uint256 amount) external onlyAdmin {
         require(to != address(0), "invalid recipient");
+        require(to != address(this), "invalid recipient");
         require(amount > 0, "invalid amount");
         balances[to] += amount;
         totalSupply += amount;
@@ -61,6 +62,7 @@ contract BergToken {
     // Transfer tokens
     function transfer(address to, uint256 amount) external {
         require(to != address(0), "invalid recipient");
+        require(to != address(this), "invalid recipient");
         require(amount > 0, "invalid amount");
         require(balances[msg.sender] >= amount, "insufficient balance");
 
