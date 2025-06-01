@@ -16,6 +16,7 @@ from eth.vm.forks.shanghai.transactions import ShanghaiTransactionBuilder
 from eth.vm.forks.cancun import CancunVM
 
 from eth_abi import abi
+from eth_abi import packed
 from eth_keys.datatypes import PrivateKey
 from eth_utils.crypto import keccak
 from eth_typing import Address
@@ -33,6 +34,40 @@ class Account:
     def address(self) -> Address:
         return Address(self.private_key.public_key.to_canonical_address())
 
+class PermitSigner:
+    def __init__(self, contract_address: Address):
+        self.nonces: dict[Address, int] = {}
+
+        self.DOMAIN_SEPARATOR = keccak(abi.encode(
+            ['bytes32', 'bytes32', 'bytes32', 'uint256', 'address'],
+            [
+                keccak(text="EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak(text="ProtocolBerg Token"), keccak(text="1"), 0, contract_address
+            ]
+        ))
+
+        self.PERMIT_TYPEHASH = keccak(text="Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+
+    def sign_permit(self, owner: Account, spender: Address, value: int, deadline: int) -> tuple[int, bytes, bytes]:
+        """Sign a permit message."""
+
+        nonce = self.nonces.get(owner.address, 0)
+        self.nonces[owner.address] = nonce + 1
+
+        permit_message = abi.encode(
+            ['bytes32', 'address', 'address', 'uint256', 'uint256', 'uint256'],
+            [self.PERMIT_TYPEHASH, owner.address, spender, value, nonce, deadline]
+        )
+
+        digest = keccak(packed.encode_packed(
+            ['bytes2', 'bytes32', 'bytes32'],
+            [b'\x19\x01', self.DOMAIN_SEPARATOR, keccak(permit_message)]
+        ))
+
+        sig = owner.private_key.sign_msg_hash(digest)
+        sig_bytes = sig.to_bytes()
+
+        return sig.v + 27, sig_bytes[0:32], sig_bytes[32:64]
 
 def get_vm() -> VirtualMachineAPI:
     PBFuzzChain = Chain.configure(
@@ -216,6 +251,8 @@ def main() -> None:
 
     function_success_and_error = { function['name']: (0, 0) for function in fuzzed_functions }
 
+    permit_signer = PermitSigner(contract.address)
+
     for episode in range(1_000):
         # randomly select a function to fuzz
         function = random.choice(fuzzed_functions)
@@ -244,10 +281,18 @@ def main() -> None:
                 continue
             random_inputs[0] = random.randint(1, min(2 * shares, 2**256 - 1))
             # TODO: fuzz higher values!
+        elif function['name'] == 'permit':
+            _, spender, value, deadline, _, _, _ = random_inputs
+            owner = random.choice(ALL_EOA)
+            v, r, s = permit_signer.sign_permit(owner, spender, value, deadline)
+            # replace the inputs with the signature
+            random_inputs: list[Any] = [owner.address, spender, value, deadline, v, r, s]
+
+            # TODO: fuzz invalid signatures too?
 
         # encode the function call
         signature = f"{function['name']}({','.join([i['type'] for i in function['inputs']])})"
-        calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)
+        calldata = keccak(text=signature)[:4] + abi.encode(input_types, random_inputs)  # type: ignore
 
         computation = create_and_execute_tx(vm, caller, contract.address, calldata)
 
