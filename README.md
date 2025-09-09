@@ -9,6 +9,10 @@ contract fuzzing, focusing on how to create a simple fuzzer using Python. The
 goal is to provide a practical understanding of fuzzing techniques and their
 application in the context of Ethereum smart contracts.
 
+## 🎥 Workshop Recording
+
+[![workshop recording still](https://img.youtube.com/vi/Z7oMWser1JU/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z7oMWser1JU)
+
 ## Repository Structure
 
 - `pbfuzz.py`: The main fuzzer implementation.
