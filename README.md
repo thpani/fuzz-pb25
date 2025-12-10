@@ -39,4 +39,4 @@ repository. You can use it with Visual Studio Code or any compatible editor that
 supports devcontainers.
 
 [Protocol Berg v2]: https://protocol.berlin/
-[Fuzzing talk]: https://cfp.protocol.berlin/protocol-berg-v2/talk/ZKLDUM/
+[Fuzzing talk]: https://blltprf.xyz/blog/25-min-solidity-fuzzer/
